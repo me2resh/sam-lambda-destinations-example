@@ -1,7 +1,7 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  
+
   golang-sam-bootstrap
   SAM Template for golang-sam-bootstrap
 
@@ -30,29 +30,67 @@ Mappings:
     production:
       VariableName: Value
 
-
 #####  Template Conditions #####
-Conditions: 
-  CreateSandboxResources: !Equals [ !Ref Stage, sandbox ]
+Conditions:
+  CreateSandboxResources: !Equals [!Ref Stage, sandbox]
 
 Resources:
-#####  Lambda Fuctions #####
-  HelloWorldFunction:
+  #####  Lambda Functions #####
+  S3FileProcessorFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./build/package/
-      Handler: hello-world
+      Handler: s3-file-processor
       Runtime: go1.x
       MemorySize: 128
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SuccessFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref FailureFunction
       Events:
-        CatchAll:
-          Type: Api
+        CreateThumbnailEvent:
+          Type: S3
           Properties:
-            Path: /hello-world
-            Method: GET
+            Bucket: !Ref S3Bucket
+            Events: s3:ObjectCreated:*
 
+  SuccessFunction:
+    Type: AWS::Serverless::Function
+    Description: This is a function to be executed upon the success of s3 file processor
+    Properties:
+      CodeUri: ./build/package/
+      Handler: success-handler
+      Runtime: go1.x
 
-Outputs:
-  HelloWorldApi:
-    Description: "API Gateway endpoint URL to print Hello, World!"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello-world/"
+  FailureFunction:
+    Type: AWS::Serverless::Function
+    Description: This is a function to be executed upon the failure of s3 file processor
+    Properties:
+      CodeUri: ./build/package/
+      Handler: failure-handler
+      Runtime: go1.x
+
+#####  Resources #####
+  ResourceSaveInvokeConfig:
+    Type: AWS::Lambda::EventInvokeConfig
+    DependsOn:
+      - S3FileProcessorFunction
+      - SuccessFunction
+      - FailureFunction
+    Properties:
+      FunctionName: !Ref S3FileProcessorFunction
+      Qualifier: "$LATEST"
+      MaximumEventAgeInSeconds: 600
+      MaximumRetryAttempts: 1
+      DestinationConfig:
+        OnSuccess:
+          Destination: !GetAtt SuccessFunction.Arn
+        OnFailure:
+          Destination: !GetAtt FailureFunction.Arn
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketName: lambda-destination-bucket-1911
