@@ -1,16 +1,14 @@
 # Golang + AWS SAM bootstrap
 
-## How to use this repo
+## Summary
 
-Click on the green button that says "Use this template", then chose a name for your new repository.
-This will create a new repository using this one.
-
-![](how-to-use.gif)
-
-
-## Contributing to this project
-
-[Check contributing guidelines](./contributing.md)
+This is an example of using lambda destinations to invoke one of two lambda functions based on the success or failure of an invocation of a lambda function.
+The project contain 3 functions:
+- s3-file-processor
+- success-handler
+- failure-handler
+and s3 bucket to trigger the s3-file-processor when you upload files to the bucket.
+ 
 
 ## Setup Instructions
 
